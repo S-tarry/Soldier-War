@@ -1,0 +1,112 @@
+extends Area2D
+
+@onready var solder_pistol = preload("res://objects/enemy/solder_pistol_enemy.tscn")
+@onready var solder_automat = preload("res://objects/enemy/solder_enemy_automat.tscn")
+@onready var solder_shotgun = preload("res://objects/enemy/solder_enemy_shotgun.tscn")
+@onready var commander = preload("res://objects/enemy/solder_enemy_commander.tscn")
+@onready var car = preload("res://objects/enemy/solder_enemy_car.tscn")
+@onready var tank1 = preload("res://objects/enemy/solder_enemy_tank_1.tscn")
+@onready var tank2 = preload("res://objects/enemy/solder_enemy_tank_2.tscn")
+
+@onready var helth_bar = $Helth
+@onready var enemy_spawner = $"../../Spawners/EnemySpawner"
+@onready var damage: AudioStreamPlayer = $Sound/Damage
+@onready var label: Label = $Label
+
+
+var destroyed = false
+var wave = 1
+var enemies_per_wave = 10
+var enemies_spawned = 0
+var max_wave = 10
+var get_coin = 50
+
+func _ready():
+	Signals.connect("bullet_damage_tower", Callable(self, "damage_bullet_to_tower"))
+	$Spawn.start()
+	$Wave.start()
+	
+	helth_bar.max_value = Globals.hp_max_tower_enemy
+	helth_bar.value = helth_bar.max_value
+	
+	label.text = str(helth_bar.value)
+
+func _physics_process(_delta):
+	if helth_bar.value <= 0:
+		helth_bar.value = 0
+		Globals.current_level_num += 1
+		if Globals.unlockedLevels < Globals.current_level_num:
+			Globals.unlockedLevels += 1
+			Globals.unlockedLevels = Globals.current_level_num
+		destroyed = true
+		Globals.upgrade_coin += 100
+		Signals.emit_signal("tower_destroyed", destroyed)
+		queue_free()
+
+func damage_bullet_to_tower(bullet_damage):
+	helth_bar.value -= bullet_damage
+	damage.play()
+	label.text = str(helth_bar.value)
+
+func _on_wave_timeout():
+	if wave < max_wave:
+		wave += 1
+		enemies_per_wave += 5
+	else:
+		enemies_per_wave += 5
+	enemies_spawned = 0
+	$Spawn.start()
+
+func _on_spawn_timeout():
+	if enemies_spawned < enemies_per_wave:
+		var mob = spawn_random_enemy()
+		if mob:
+			mob.position = enemy_spawner.position
+			$"../../Enemy(mobs)".add_child(mob)
+			enemies_spawned += 1
+	else:
+		$Spawn.stop()
+
+func spawn_random_enemy():
+	var enemies = []
+	
+	# Списки ворогів для кожного рівня
+	var level_1_enemies = [solder_pistol]
+	var level_2_enemies = [solder_pistol, solder_automat]
+	var level_3_enemies = [solder_pistol, solder_automat, solder_shotgun]
+	var level_4_enemies = [solder_pistol, solder_automat, solder_shotgun, commander]
+	var level_5_enemies = [solder_pistol, solder_automat, solder_shotgun, commander, car]
+	var level_6_enemies = [solder_pistol, solder_automat, solder_shotgun, commander, car, tank1]
+	var level_7_enemies = [solder_pistol, solder_automat, solder_shotgun, commander, car, tank1, tank2]
+	
+	# Вибір ворогів залежно від рівня
+	if Globals.current_level_num == 10:
+		enemies = level_7_enemies
+	elif Globals.current_level_num == 8 or Globals.current_level_num == 9:
+		enemies = level_6_enemies
+	elif Globals.current_level_num == 7:
+		enemies = level_5_enemies
+	elif Globals.current_level_num == 6:
+		enemies = level_4_enemies
+	elif Globals.current_level_num == 4 or Globals.current_level_num == 5:
+		enemies = level_3_enemies
+	elif Globals.current_level_num == 2 or Globals.current_level_num == 3:
+		enemies = level_2_enemies
+	elif Globals.current_level_num == 1:
+		enemies = level_1_enemies
+	
+	# Вибір ворогів залежно від хвилі
+	if wave >= 2 and solder_shotgun in enemies:
+		enemies = enemies.slice(0, enemies.size() - 1)  # Виключаємо найсильнішого ворога до 2-ї хвилі
+	if wave >= 3 and car in enemies:
+		enemies = enemies.slice(0, enemies.size() - 1)  # Додаємо лише до 3-ї хвилі
+	if wave >= 4 and tank1 in enemies:
+		enemies = enemies.slice(0, enemies.size() - 1)  # Додаємо лише до 4-ї хвилі
+	if wave >= 5 and tank2 in enemies:
+		enemies = enemies.slice(0, enemies.size() - 1)  # Додаємо лише до 5-ї хвилі
+	
+	# Випадковий вибір ворога з доступного списку
+	if enemies.size() > 0:
+		var random_enemy = enemies[randi() % enemies.size()]
+		return random_enemy.instantiate()
+	return null

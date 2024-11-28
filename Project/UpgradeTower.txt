@@ -1,0 +1,46 @@
+extends Node2D
+
+@onready var tower_player = $"../Towers/tower_player"
+@onready var lvl_text: Label = $Control/PanelContainer/VBoxContainer/HBoxContainer/lvl_text
+@onready var heatlh_text: Label = $Control/PanelContainer/VBoxContainer/HBoxContainer2/Heatlh_text
+@onready var coin_text: Label = $Control/PanelContainer/VBoxContainer/HBoxContainer3/Coin_text
+
+var upgrade_cost: int = 50
+
+
+func _ready() -> void:
+	lvl_text.text = str(Globals.min_level, " lvl, ", "next - ", upgrade_cost)
+	heatlh_text.text = str(Globals.hp_max_tower_player)
+	coin_text.text = str(Globals.get_coin_per_sec, " / sec")
+
+
+func _on_upgrade_pressed():
+	if Globals.min_level <= Globals.max_level and Globals.upgrade_coin >= upgrade_cost:
+		
+		Globals.upgrade_coin -= upgrade_cost
+		upgrade_cost += 50
+		Globals.min_level += 1
+		Globals.get_coin_per_sec += 1
+		Globals.hp_max_tower_player += 100
+		
+		$Control/PanelContainer/VBoxContainer/HBoxContainer/LvlBar.value += 1
+		$Control/PanelContainer/VBoxContainer/HBoxContainer2/HealthBar.value += 1
+		$Control/PanelContainer/VBoxContainer/HBoxContainer3/CoinBar.value += 1
+		
+		lvl_text.text = str(Globals.min_level, " lvl, ", "next - ", upgrade_cost)
+		heatlh_text.text = str(Globals.hp_max_tower_player)
+		coin_text.text = str(Globals.get_coin_per_sec, " / sec")
+		tower_player.upgrade_tower()
+	
+	
+func _physics_process(_delta):
+	if Globals.min_level > Globals.max_level:
+		lvl_text.text = str("Max")
+		heatlh_text.text = str("Max")
+		coin_text.text = str("Max")
+		
+
+	$Control/HBoxContainer/Label.text = str(Globals.upgrade_coin)
+
+func _on_button_pressed():
+	get_tree().change_scene_to_file("res://scenes/main/menu.tscn")

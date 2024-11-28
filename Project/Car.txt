@@ -1,0 +1,156 @@
+extends CharacterBody2D
+
+class_name  SolderCarEnemy
+
+@onready var marker_2d = $Marker2D
+@onready var shoot_timer = $Shoot
+@onready var check_player_or_tower = $CheckPlayer
+@onready var check_some = $CheckSome
+@onready var shoots: AudioStreamPlayer = $Sound/Shoots
+@onready var damage: AudioStreamPlayer = $Sound/Damage
+
+
+@onready var BULLET = load("res://objects/bullets enemy/bullet_enemy.tscn")
+
+var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
+
+#shoot
+var shoot_speed = 0.2
+var can_shoot = false
+var bulletDirection = Vector2(1, 0)
+
+#other
+var get_coin = 70
+var speed = -60
+var walk = true
+var state = RUN
+var hp_max = 100
+var hp: int = 0
+var bullet_dmg: int
+var set_bullet_dmg: int = 4
+
+#bonus
+var bonus_hp = 50
+var not_bonus_hp = 100
+var bonus_dmg = 1
+var not_bonus_dmg = 4
+var get_bonus = true
+
+enum {
+	SHOOT,
+	DEAD,
+	RUN,
+	IDLE
+}
+
+
+func _ready():
+	hp = hp_max
+	shoot_timer.wait_time = shoot_speed
+	Signals.connect("bullet_damage_enemy", Callable(self, "bullet_damage_to_enemy"))
+
+func _physics_process(delta):
+	
+	
+	check_player()
+	check_somebody()
+	
+	match state:
+		SHOOT:
+			shoot()
+		DEAD:
+			pass
+		RUN:
+			run()
+		IDLE:
+			idle()
+
+	
+	if not is_on_floor():
+		velocity.y += gravity * delta
+		
+	if hp <= 0:
+		Globals.coin += get_coin
+		queue_free()
+		
+	if walk == false:
+		state = IDLE
+	else:
+		state = RUN
+
+
+	move_and_slide()
+
+func shoot():
+	if can_shoot == true:
+		shoot_timer.start()
+		$AnimatedSprite2D.play("Shoot")
+		shoots.play()
+		var bulletNode = BULLET.instantiate()
+		bulletNode._set_direction(bulletDirection)
+		bulletNode.damage = set_bullet_dmg
+		get_tree().root.add_child(bulletNode)
+		bulletNode.global_position = marker_2d.global_position
+
+func _on_shoot_timeout():
+	if can_shoot == true:
+		state = SHOOT
+
+func setup_direction(direction):
+	bulletDirection = direction
+	
+	if direction.x > 0:
+		scale.x = 1
+		rotation_degrees = 0
+	elif direction.x < 0:
+		scale.x = -1
+		rotation_degrees = 0
+
+func run():
+	if walk == true:
+		if can_shoot == false:
+			$AnimatedSprite2D.play("Drive")
+		velocity.x = speed
+
+func idle():
+	if walk == false:
+		if can_shoot == false:
+			$AnimatedSprite2D.play("Idle")
+		velocity.x = 0 
+
+func dead():
+	pass
+
+func bullet_damage_to_enemy(bullet_damage):
+	bullet_dmg = bullet_damage
+
+func _on_bullet_dmg_area_entered(_area):
+	await get_tree().create_timer(0.1).timeout
+	damage.play()
+	hp -= bullet_dmg
+	
+
+func check_player():
+	if check_player_or_tower.is_colliding():
+		walk = false
+		can_shoot = true
+	else:
+		walk = true
+		can_shoot = false
+
+func check_somebody():
+	if check_some.is_colliding():
+		walk = false
+
+
+func _on_area_eneterd_commander_area_entered(_area):
+	get_bonus = true
+	if get_bonus == true:
+		hp += bonus_hp
+		set_bullet_dmg += bonus_dmg
+
+
+func _on_area_eneterd_commander_area_exited(_area):
+	get_bonus = false
+	hp = not_bonus_hp
+	set_bullet_dmg = not_bonus_dmg
